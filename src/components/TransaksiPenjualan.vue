@@ -20,7 +20,7 @@
       <!-- Order List Banner -->
       <div class="order-list-banner">
         <h2 class="banner-title">Order List</h2>
-        <p class="banner-subtitle">ID Transaksi : {{ transactionCode }}</p>
+        <!-- <p class="banner-subtitle">Kode Transaksi : {{ kodeTransaksi }}</p> -->
       </div>
 
       <!-- Cari Produk Dropdown -->
@@ -145,7 +145,7 @@ type CartItem = ProductResponse & { jumlah: number }
 const cart = ref<CartItem[]>([])
 
 // Auto generate TR code based on timestamp
-const transactionCode = ref(`TRX${Date.now().toString().slice(-6)}`)
+const kodeTransaksi = ref(`TRX${Date.now().toString().slice(-6)}`)
 
 onMounted(async () => {
   try {
@@ -186,7 +186,7 @@ const clearCart = () => {
   cart.value = []
   errorMsg.value = ''
   successMsg.value = ''
-  transactionCode.value = `TRX${Date.now().toString().slice(-6)}`
+  kodeTransaksi.value = `TRX${Date.now().toString().slice(-6)}`
 }
 
 const grandTotal = computed(() => {
@@ -214,7 +214,7 @@ const submitTransaction = async () => {
     const today = new Date().toISOString().split('T')[0]
     
     const payload: TransactionReq = {
-      kodeTransaksi: transactionCode.value,
+      kodeTransaksi: kodeTransaksi.value,
       transactionDate: today,
       catatan: 'Transaksi Penjualan Manual',
       details: cart.value.map(item => ({

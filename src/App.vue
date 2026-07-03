@@ -46,10 +46,10 @@
         key="manajemen-pengguna"
       />
 
-      <!-- Super Admin (Edit Profil) -->
+      <!-- Profil -->
       <ProfilPage
-        v-else-if="activePage === 'super-admin'"
-        key="super-admin"
+        v-else-if="activePage === 'profil'"
+        key="profil"
       />
 
       <!-- Data Master Produk -->
@@ -94,6 +94,12 @@
         key="rekomendasi-pengadaan"
       />
 
+      <!-- Laporan Penjualan -->
+      <LaporanPenjualan
+        v-else-if="activePage === 'laporan-penjualan'"
+        key="laporan-penjualan"
+      />
+
       <!-- Placeholder untuk halaman lain -->
       <div v-else key="placeholder" class="page-placeholder">
         <div class="placeholder-inner">
@@ -128,6 +134,7 @@ import RiwayatTransaksiPenjualan from './components/RiwayatTransaksiPenjualan.vu
 import ProsesApriori from './components/ProsesApriori.vue'
 import HasilAnalisa from './components/HasilAnalisa.vue'
 import RekomendasiPengadaan from './components/RekomendasiPengadaan.vue'
+import LaporanPenjualan from './components/LaporanPenjualan.vue'
 import { getToken, getUserId, apiGetUser } from './api'
 
 // ── App State ──
@@ -166,7 +173,7 @@ onMounted(() => {
 
 // ── Page labels (untuk placeholder) ──
 const pageLabels: Record<string, string> = {
-  'super-admin': 'Super Admin',
+  'profil': 'Profil',
   'manajemen-pengguna': 'Manajemen Pengguna',
   'data-master-produk': 'Data Master Produk',
   'data-master-kategori': 'Data Master Kategori',

@@ -95,7 +95,7 @@
                 <td>{{ row.jumlah }}</td>
                 <td>{{ row.support }}%</td>
                 <td>
-                  <span :class="['badge', row.keterangan.toLowerCase() === 'lolos' ? 'badge-success' : 'badge-danger']">
+                  <span :class="row.keterangan.toLowerCase() === 'lolos' ? 'text-success' : 'text-danger'">
                     {{ row.keterangan }}
                   </span>
                 </td>
@@ -129,7 +129,7 @@
                 <td>{{ row.jumlah }}</td>
                 <td>{{ row.support }}%</td>
                 <td>
-                  <span :class="['badge', row.keterangan.toLowerCase() === 'lolos' ? 'badge-success' : 'badge-danger']">
+                  <span :class="row.keterangan.toLowerCase() === 'lolos' ? 'text-success' : 'text-danger'">
                     {{ row.keterangan }}
                   </span>
                 </td>
@@ -140,35 +140,73 @@
         </div>
       </div>
 
-      <!-- Confidence Itemset 2 -->
+      <!-- Itemset 3 -->
       <div class="panel">
-        <div class="panel-header">Confidence Itemset 2</div>
+        <div class="panel-header">Itemset 3</div>
         <div class="table-wrapper">
           <table class="data-table">
             <thead>
               <tr>
-                <th style="width: 8%">No</th>
-                <th style="width: 25%">Item 1 & 2</th>
+                <th style="width: 10%">No</th>
+                <th style="width: 20%">Item 1</th>
+                <th style="width: 20%">Item 2</th>
+                <th style="width: 20%">Item 3</th>
+                <th style="width: 10%">Jumlah</th>
+                <th style="width: 10%">Min Support</th>
+                <th style="width: 10%">Keterangan</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in itemset3" :key="idx">
+                <td>{{ idx + 1 }}</td>
+                <td>{{ splitItem(row.item, 0) }}</td>
+                <td>{{ splitItem(row.item, 1) }}</td>
+                <td>{{ splitItem(row.item, 2) }}</td>
+                <td>{{ row.jumlah }}</td>
+                <td>{{ row.support }}%</td>
+                <td>
+                  <span :class="row.keterangan.toLowerCase() === 'lolos' ? 'text-success' : 'text-danger'">
+                    {{ row.keterangan }}
+                  </span>
+                </td>
+              </tr>
+              <tr v-if="itemset3.length === 0"><td colspan="7" class="text-center">Tidak ada data</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Confidence -->
+      <div class="panel">
+        <div class="panel-header">Rule (Confidence)</div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width: 5%">No</th>
+                <th style="width: 20%">Antecedent</th>
+                <th style="width: 20%">Consequent</th>
                 <th style="width: 15%">Support A ∪ B</th>
-                <th style="width: 15%">Support A</th>
-                <th style="width: 17%">Nilai Confidence</th>
-                <th style="width: 20%">Keterangan</th>
+                <th style="width: 10%">Support A</th>
+                <th style="width: 15%">Nilai Confidence</th>
+                <th style="width: 15%">Keterangan</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(rule, idx) in rules" :key="idx">
                 <td>{{ idx + 1 }}</td>
-                <td>{{ rule.antecedent }}, {{ rule.consequent }}</td>
+                <td>{{ rule.antecedent }}</td>
+                <td>{{ rule.consequent }}</td>
                 <td>{{ getSupportAUB(rule.antecedent, rule.consequent) }}%</td>
                 <td>{{ getSupportA(rule.antecedent) }}%</td>
                 <td>{{ rule.confidence }}%</td>
                 <td>
-                  <span :class="['badge', rule.keterangan.toLowerCase() === 'lolos' ? 'badge-success' : 'badge-danger']">
+                  <span :class="rule.keterangan.toLowerCase() === 'lolos' ? 'text-success' : 'text-danger'">
                     {{ rule.keterangan }}
                   </span>
                 </td>
               </tr>
-              <tr v-if="rules.length === 0"><td colspan="6" class="text-center">Tidak ada data rule</td></tr>
+              <tr v-if="rules.length === 0"><td colspan="7" class="text-center">Tidak ada data rule</td></tr>
             </tbody>
           </table>
         </div>
@@ -206,13 +244,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { apiGetItemset1, apiGetItemset2, apiGetRules } from '../api'
+import { apiGetItemset1, apiGetItemset2, apiGetItemset3, apiGetRules } from '../api'
 import type { AprioriItemsetRes, AprioriRuleRes } from '../api'
 
 const startDate = ref('')
 const endDate = ref('')
-const minSupport = ref('10')
-const minConfidence = ref('50')
+const minSupport = ref('0')
+const minConfidence = ref('0')
 
 const loading = ref(false)
 const hasResults = ref(false)
@@ -222,6 +260,7 @@ const ruleId = ref('')
 
 const itemset1 = ref<AprioriItemsetRes[]>([])
 const itemset2 = ref<AprioriItemsetRes[]>([])
+const itemset3 = ref<AprioriItemsetRes[]>([])
 const rules = ref<AprioriRuleRes[]>([])
 
 const formatDateToDDMMYYYY = (isoDate: string) => {
@@ -253,6 +292,7 @@ const runApriori = async () => {
     // But since the backend gives separate endpoints, we just call them.
     itemset1.value = await apiGetItemset1(payload)
     itemset2.value = await apiGetItemset2(payload)
+    itemset3.value = await apiGetItemset3(payload)
     rules.value = await apiGetRules(payload)
     
     ruleId.value = Math.floor(Math.random() * 100).toString()
@@ -267,11 +307,12 @@ const runApriori = async () => {
 const resetForm = () => {
   startDate.value = ''
   endDate.value = ''
-  minSupport.value = '10'
-  minConfidence.value = '50'
+  minSupport.value = '0'
+  minConfidence.value = '0'
   hasResults.value = false
   itemset1.value = []
   itemset2.value = []
+  itemset3.value = []
   rules.value = []
   errorMsg.value = ''
 }
@@ -283,16 +324,42 @@ const splitItem = (itemStr: string, index: number) => {
 }
 
 const getSupportA = (antecedent: string) => {
-  const found = itemset1.value.find(i => i.item === antecedent)
-  return found ? found.support : '-'
+  if (!antecedent) return '-'
+  const items = antecedent.split(',').map(s => s.trim())
+  
+  if (items.length === 1) {
+    const found = itemset1.value.find(i => i.item === antecedent)
+    return found ? found.support : '-'
+  } else if (items.length === 2) {
+    const found = itemset2.value.find(i => {
+      const set = i.item.split(',').map(s => s.trim())
+      return set.includes(items[0]) && set.includes(items[1]) && set.length === 2
+    })
+    return found ? found.support : '-'
+  }
+  return '-'
 }
 
 const getSupportAUB = (antecedent: string, consequent: string) => {
-  // itemset2 can be "A, B" or "B, A"
-  const combo1 = `${antecedent}, ${consequent}`
-  const combo2 = `${consequent}, ${antecedent}`
-  const found = itemset2.value.find(i => i.item === combo1 || i.item === combo2)
-  return found ? found.support : '-'
+  if (!antecedent || !consequent) return '-'
+  const itemsA = antecedent.split(',').map(s => s.trim())
+  const itemsB = consequent.split(',').map(s => s.trim())
+  const allItems = [...itemsA, ...itemsB]
+  
+  if (allItems.length === 2) {
+    const found = itemset2.value.find(i => {
+      const set = i.item.split(',').map(s => s.trim())
+      return allItems.every(item => set.includes(item)) && set.length === 2
+    })
+    return found ? found.support : '-'
+  } else if (allItems.length === 3) {
+    const found = itemset3.value.find(i => {
+      const set = i.item.split(',').map(s => s.trim())
+      return allItems.every(item => set.includes(item)) && set.length === 3
+    })
+    return found ? found.support : '-'
+  }
+  return '-'
 }
 
 </script>
@@ -548,16 +615,8 @@ const getSupportAUB = (antecedent: string, consequent: string) => {
 }
 .data-table tr:hover td { background: #fcfcfd; }
 
-.badge {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #fff;
-}
-.badge-success { background: #06b6d4; } /* Cyan to match mockup "Lolos" */
-.badge-danger { background: #ff0000; } /* Red for "Tidak Lolos" */
+.text-success { color: #06b6d4; font-weight: 700; } /* Cyan to match mockup "Lolos" */
+.text-danger { color: #ff0000; font-weight: 700; } /* Red for "Tidak Lolos" */
 .text-center { text-align: center; }
 
 </style>
