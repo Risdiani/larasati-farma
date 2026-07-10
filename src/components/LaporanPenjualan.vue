@@ -22,7 +22,7 @@
             <span class="range-separator">s/d</span>
             <input type="date" v-model="endDate" class="date-input range-input" />
           </div>
-          <button class="btn-primary" @click="loadData">Cari Transaksi</button>
+          <button class="btn-primary" @click="handleSearch">Cari Transaksi</button>
         </div>
       </div>
     </div>
@@ -73,7 +73,7 @@
       </div>
 
       <!-- Pagination -->
-      <div class="pagination" v-if="!loading && filteredTransactions.length > 0">
+      <div class="pagination" v-if="!loading && paginatedData.length > 0">
         <button class="page-btn nav-btn" :disabled="currentPage === 1" @click="currentPage--">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
@@ -94,12 +94,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { apiGetTransactions } from '../api'
 import type { TransactionRes } from '../api'
 
-const rawTransactions = ref<TransactionRes[]>([])
-const filteredTransactions = ref<TransactionRes[]>([])
+const paginatedData = ref<TransactionRes[]>([])
+const totalPages = ref(1)
 const loading = ref(true)
 
 const startDate = ref('')
@@ -108,12 +108,33 @@ const endDate = ref('')
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
 
+watch(itemsPerPage, () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  } else {
+    loadData()
+  }
+})
+
+watch(currentPage, () => {
+  loadData()
+})
+
+const handleSearch = () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  } else {
+    loadData()
+  }
+}
+
 const loadData = async () => {
   try {
     loading.value = true
-    const res = await apiGetTransactions()
-    rawTransactions.value = res.reverse()
-    applyFilter()
+    const pageIndex = currentPage.value - 1
+    const res = await apiGetTransactions(pageIndex, itemsPerPage.value, startDate.value || undefined, endDate.value || undefined)
+    paginatedData.value = res.content || []
+    totalPages.value = res.totalPages
   } catch (e) {
     console.error(e)
   } finally {
@@ -121,29 +142,8 @@ const loadData = async () => {
   }
 }
 
-const applyFilter = () => {
-  let filtered = rawTransactions.value
-  
-  if (startDate.value) {
-    filtered = filtered.filter(item => item.transactionDate >= startDate.value)
-  }
-  if (endDate.value) {
-    filtered = filtered.filter(item => item.transactionDate <= endDate.value)
-  }
-  
-  filteredTransactions.value = filtered
-  currentPage.value = 1
-}
-
 onMounted(() => {
   loadData()
-})
-
-const totalPages = computed(() => Math.ceil(filteredTransactions.value.length / itemsPerPage.value))
-
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  return filteredTransactions.value.slice(start, start + itemsPerPage.value)
 })
 
 const visiblePages = computed(() => {

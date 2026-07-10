@@ -149,7 +149,7 @@ export const apiGetRoles = async (): Promise<Role[]> => {
     throw new Error(json.message || 'Gagal memuat daftar role')
   }
 
-  return json.data
+  return Array.isArray(json.data) ? json.data : ((json.data as any).content || [])
 }
 
 // ============================================================
@@ -185,7 +185,7 @@ export const apiGetUsers = async (): Promise<UserResponse[]> => {
   })
   const json: BaseResponse<UserResponse[]> = await res.json()
   if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat pengguna')
-  return json.data
+  return Array.isArray(json.data) ? json.data : ((json.data as any).content || [])
 }
 
 // ============================================================
@@ -258,7 +258,7 @@ export const apiGetProducts = async (): Promise<ProductResponse[]> => {
   })
   const json: BaseResponse<ProductResponse[]> = await res.json()
   if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat produk')
-  return json.data
+  return Array.isArray(json.data) ? json.data : ((json.data as any).content || [])
 }
 
 export const apiGetProduct = async (id: number): Promise<ProductResponse> => {
@@ -326,7 +326,7 @@ export const apiGetCategories = async (): Promise<CategoryResponse[]> => {
   })
   const json: BaseResponse<CategoryResponse[]> = await res.json()
   if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat kategori')
-  return json.data
+  return Array.isArray(json.data) ? json.data : ((json.data as any).content || [])
 }
 
 export const apiGetCategory = async (id: number): Promise<CategoryResponse> => {
@@ -422,12 +422,30 @@ export const apiCreateTransaction = async (body: TransactionReq): Promise<Transa
   return json.data
 }
 
-export const apiGetTransactions = async (): Promise<TransactionRes[]> => {
-  const res = await fetch(`${BASE_URL}/transactions`, {
+export interface PaginatedData<T> {
+  content: T[]
+  last: boolean
+  totalElements: number
+  totalPages: number
+  size: number
+  number: number
+  numberOfElements: number
+  first: boolean
+  empty: boolean
+}
+
+export const apiGetTransactions = async (page: number = 0, size: number = 10, tglAwal?: string, tglAkhir?: string): Promise<PaginatedData<TransactionRes>> => {
+  const params = new URLSearchParams()
+  params.append('page', page.toString())
+  params.append('size', size.toString())
+  if (tglAwal) params.append('tglAwal', tglAwal)
+  if (tglAkhir) params.append('tglAkhir', tglAkhir)
+
+  const res = await fetch(`${BASE_URL}/transactions?${params.toString()}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json', ...authHeader() },
   })
-  const json: BaseResponse<TransactionRes[]> = await res.json()
+  const json: BaseResponse<PaginatedData<TransactionRes>> = await res.json()
   if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat transaksi')
   return json.data
 }
@@ -454,10 +472,11 @@ export const apiImportExcelTransaction = async (file: File): Promise<void> => {
 // Apriori Analysis Types & Endpoints
 // ============================================================
 export interface AprioriReq {
+  processId: number
   minSupport: number
   minConfidence: number
-  startDate: string // dd/MM/yyyy
-  endDate: string   // dd/MM/yyyy
+  startDate: string // YYYY-MM-DD
+  endDate: string   // YYYY-MM-DD
 }
 
 export interface AprioriItemsetRes {
@@ -474,7 +493,15 @@ export interface AprioriRuleRes {
   keterangan: string
 }
 
-export const apiGetItemset1 = async (body: AprioriReq): Promise<AprioriItemsetRes[]> => {
+export interface AprioriProcessRes<T> {
+  processId: number
+  namaProses: string
+  status: string
+  totalTransaksi: number
+  data: T[]
+}
+
+export const apiGetItemset1 = async (body: AprioriReq): Promise<AprioriProcessRes<AprioriItemsetRes>> => {
   const res = await fetch(`${BASE_URL}/apriori/itemset1`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader() },
@@ -485,7 +512,7 @@ export const apiGetItemset1 = async (body: AprioriReq): Promise<AprioriItemsetRe
   return json.data
 }
 
-export const apiGetItemset2 = async (body: AprioriReq): Promise<AprioriItemsetRes[]> => {
+export const apiGetItemset2 = async (body: AprioriReq): Promise<AprioriProcessRes<AprioriItemsetRes>> => {
   const res = await fetch(`${BASE_URL}/apriori/itemset2`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader() },
@@ -496,7 +523,7 @@ export const apiGetItemset2 = async (body: AprioriReq): Promise<AprioriItemsetRe
   return json.data
 }
 
-export const apiGetItemset3 = async (body: AprioriReq): Promise<AprioriItemsetRes[]> => {
+export const apiGetItemset3 = async (body: AprioriReq): Promise<AprioriProcessRes<AprioriItemsetRes>> => {
   const res = await fetch(`${BASE_URL}/apriori/itemset3`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader() },
@@ -507,7 +534,7 @@ export const apiGetItemset3 = async (body: AprioriReq): Promise<AprioriItemsetRe
   return json.data
 }
 
-export const apiGetRules = async (body: AprioriReq): Promise<AprioriRuleRes[]> => {
+export const apiGetRules = async (body: AprioriReq): Promise<AprioriProcessRes<AprioriRuleRes>> => {
   const res = await fetch(`${BASE_URL}/apriori/rules`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeader() },

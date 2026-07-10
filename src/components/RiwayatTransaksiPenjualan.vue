@@ -24,10 +24,12 @@
             <span class="range-separator">s/d</span>
             <input type="date" v-model="endDate" class="date-input range-input" />
           </div>
-          <button class="btn-primary" @click="loadData">Cari Transaksi</button>
+          <button class="btn-primary" @click="handleSearch">Cari Transaksi</button>
           
           <div class="divider"></div>
           
+          <button class="btn-primary" @click="emit('navigate', 'transaksi-penjualan')">+ Transaksi Baru</button>
+
           <button class="btn-primary" @click="triggerFileInput" :disabled="uploading">
             <span v-if="uploading" class="btn-spinner"></span>
             <span v-else>Import Data Transaksi</span>
@@ -94,7 +96,7 @@
       </div>
 
       <!-- Pagination -->
-      <div class="pagination-wrapper" v-if="!loading && flatTransactions.length > 0">
+      <div class="pagination-wrapper" v-if="!loading && paginatedData.length > 0">
         <div class="items-per-page">
           <span class="text-slate-500 mr-2">Tampilkan:</span>
           <select v-model="itemsPerPage" class="page-select">
@@ -142,6 +144,10 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { apiGetTransactions, apiImportExcelTransaction } from '../api'
 
+const emit = defineEmits<{
+  (e: 'navigate', page: string): void
+}>()
+
 interface FlatTransaction {
   kodeTransaksi: string
   tanggal: string
@@ -151,8 +157,8 @@ interface FlatTransaction {
   subtotal: number
 }
 
-const rawTransactions = ref<FlatTransaction[]>([])
-const flatTransactions = ref<FlatTransaction[]>([])
+const paginatedData = ref<FlatTransaction[]>([])
+const totalPages = ref(1)
 const loading = ref(true)
 const uploading = ref(false)
 const errorMsg = ref('')
@@ -168,23 +174,45 @@ const currentPage = ref(1)
 const itemsPerPage = ref(10)
 
 watch(itemsPerPage, () => {
-  currentPage.value = 1
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  } else {
+    loadData()
+  }
 })
+
+watch(currentPage, () => {
+  loadData()
+})
+
+const handleSearch = () => {
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  } else {
+    loadData()
+  }
+}
 
 const loadData = async () => {
   try {
     loading.value = true
     errorMsg.value = ''
     successMsg.value = ''
-    const res = await apiGetTransactions()
     
-    // Flatten transactions to display one row per detail item (like the mockup)
+    const pageIndex = currentPage.value - 1
+    const res = await apiGetTransactions(pageIndex, itemsPerPage.value, startDate.value || undefined, endDate.value || undefined)
+    
+    totalPages.value = res.totalPages
+    
     const flattened: FlatTransaction[] = []
-    res.forEach(trx => {
-      trx.details.forEach(detail => {
+    const transactionsList = res.content || []
+    
+    transactionsList.forEach(trx => {
+      const detailsList = Array.isArray(trx.details) ? trx.details : []
+      detailsList.forEach(detail => {
         flattened.push({
           kodeTransaksi: trx.kodeTransaksi,
-          tanggal: trx.transactionDate, // Usually YYYY-MM-DD
+          tanggal: trx.transactionDate,
           namaProduk: detail.namaProduk,
           hargaSatuan: detail.hargaSatuan,
           jumlah: detail.jumlah,
@@ -193,29 +221,12 @@ const loadData = async () => {
       })
     })
     
-    // Sort by most recent based on ID or date if needed, keeping them simple for now
-    rawTransactions.value = flattened.reverse()
-    applyFilter()
-    
+    paginatedData.value = flattened
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : 'Gagal memuat data'
   } finally {
     loading.value = false
   }
-}
-
-const applyFilter = () => {
-  let filtered = rawTransactions.value
-  
-  if (startDate.value) {
-    filtered = filtered.filter(item => item.tanggal >= startDate.value)
-  }
-  if (endDate.value) {
-    filtered = filtered.filter(item => item.tanggal <= endDate.value)
-  }
-  
-  flatTransactions.value = filtered
-  currentPage.value = 1
 }
 
 onMounted(() => {
@@ -252,12 +263,6 @@ const handleFileUpload = async (event: Event) => {
 }
 
 // Pagination logic
-const totalPages = computed(() => Math.ceil(flatTransactions.value.length / itemsPerPage.value))
-
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  return flatTransactions.value.slice(start, start + itemsPerPage.value)
-})
 
 const visiblePages = computed(() => {
   const total = totalPages.value

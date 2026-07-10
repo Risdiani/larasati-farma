@@ -280,6 +280,7 @@ const runApriori = async () => {
   hasResults.value = false
   
   const payload = {
+    processId: 0,
     minSupport: Number(minSupport.value),
     minConfidence: Number(minConfidence.value),
     startDate: formatDateToDDMMYYYY(startDate.value),
@@ -287,15 +288,23 @@ const runApriori = async () => {
   }
 
   try {
-    // Run them sequentially or parallel. Running sequential ensures we don't spam backend too hard.
-    // In Apriori, sometimes itemset2 depends on itemset1 being calculated.
-    // But since the backend gives separate endpoints, we just call them.
-    itemset1.value = await apiGetItemset1(payload)
-    itemset2.value = await apiGetItemset2(payload)
-    itemset3.value = await apiGetItemset3(payload)
-    rules.value = await apiGetRules(payload)
+    // Itemset 1: processId = 0, backend akan generate processId baru
+    const res1 = await apiGetItemset1(payload)
+    itemset1.value = res1.data || []
+
+    // Ambil processId dari response itemset1 untuk request selanjutnya
+    payload.processId = res1.processId
+
+    const res2 = await apiGetItemset2(payload)
+    itemset2.value = res2.data || []
+
+    const res3 = await apiGetItemset3(payload)
+    itemset3.value = res3.data || []
+
+    const resRules = await apiGetRules(payload)
+    rules.value = resRules.data || []
     
-    ruleId.value = Math.floor(Math.random() * 100).toString()
+    ruleId.value = res1.processId.toString()
     hasResults.value = true
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : 'Terjadi kesalahan saat memproses apriori.'

@@ -74,6 +74,7 @@
       <RiwayatTransaksiPenjualan
         v-else-if="activePage === 'riwayat-transaksi'"
         key="riwayat-transaksi"
+        @navigate="activePage = $event"
       />
 
       <!-- Proses Algoritma Apriori -->
