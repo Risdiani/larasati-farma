@@ -27,6 +27,37 @@
       </div>
     </div>
 
+    <!-- ── Summary Cards ── -->
+    <div class="summary-cards" v-if="!loading && paginatedData.length > 0">
+      <div class="summary-card">
+        <div class="summary-icon" style="background: linear-gradient(135deg,#2456A4,#3b82f6)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        </div>
+        <div class="summary-body">
+          <p class="summary-label">Total Transaksi (periode)</p>
+          <p class="summary-value">{{ summaryStats.totalTransaksi.toLocaleString('id-ID') }}</p>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon" style="background: linear-gradient(135deg,#10b981,#34d399)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="summary-body">
+          <p class="summary-label">Total Pendapatan (halaman ini)</p>
+          <p class="summary-value">Rp {{ summaryStats.totalPendapatan.toLocaleString('id-ID') }}</p>
+        </div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-icon" style="background: linear-gradient(135deg,#f59e0b,#fbbf24)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        </div>
+        <div class="summary-body">
+          <p class="summary-label">Total Item Terjual (halaman ini)</p>
+          <p class="summary-value">{{ summaryStats.totalItem.toLocaleString('id-ID') }} item</p>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Data Table ── -->
     <div class="card table-card">
       <div class="card-header">
@@ -100,6 +131,7 @@ import type { TransactionRes } from '../api'
 
 const paginatedData = ref<TransactionRes[]>([])
 const totalPages = ref(1)
+const totalElements = ref(0)
 const loading = ref(true)
 
 const startDate = ref('')
@@ -135,6 +167,7 @@ const loadData = async () => {
     const res = await apiGetTransactions(pageIndex, itemsPerPage.value, startDate.value || undefined, endDate.value || undefined)
     paginatedData.value = res.content || []
     totalPages.value = res.totalPages
+    totalElements.value = res.totalElements
   } catch (e) {
     console.error(e)
   } finally {
@@ -144,6 +177,16 @@ const loadData = async () => {
 
 onMounted(() => {
   loadData()
+})
+
+// Summary stats computed from current page data
+const summaryStats = computed(() => {
+  const txList = paginatedData.value
+  return {
+    totalTransaksi: totalElements.value,
+    totalPendapatan: txList.reduce((sum, t) => sum + (t.totalHarga || 0), 0),
+    totalItem: txList.reduce((sum, t) => sum + (t.details?.reduce((s, d) => s + d.jumlah, 0) ?? 0), 0),
+  }
 })
 
 const visiblePages = computed(() => {
@@ -426,4 +469,43 @@ const getTotalItems = (trx: TransactionRes) => {
 .text-center { text-align: center; }
 .py-8 { padding-top: 32px; padding-bottom: 32px; }
 .text-slate-500 { color: #64748b; }
+
+/* ── Summary Cards ── */
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.summary-card {
+  background: #fff;
+  border: 1px solid #e8edf3;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+  transition: box-shadow 0.2s;
+}
+.summary-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.06); }
+.summary-icon {
+  width: 48px; height: 48px;
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.summary-body { display: flex; flex-direction: column; gap: 4px; }
+.summary-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin: 0;
+}
+.summary-value {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
 </style>

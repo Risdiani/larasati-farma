@@ -152,18 +152,20 @@
               <th>Tanggal</th>
               <th>Total Item</th>
               <th>Total Harga</th>
-              <th>Status</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in recentTransactions" :key="row.id">
-              <td class="col-id">{{ row.id }}</td>
-              <td>{{ row.date }}</td>
-              <td>{{ row.items }} item</td>
-              <td class="col-price">{{ row.total }}</td>
-              <td>
-                <span class="badge" :class="row.statusClass">{{ row.status }}</span>
-              </td>
+            <tr v-if="loadingTransactions">
+              <td colspan="4" class="text-center py-8">Memuat data...</td>
+            </tr>
+            <tr v-else-if="recentTransactions.length === 0">
+              <td colspan="4" class="text-center py-8">Tidak ada transaksi terbaru.</td>
+            </tr>
+            <tr v-else v-for="row in recentTransactions" :key="row.kodeTransaksi">
+              <td class="col-id">{{ row.kodeTransaksi }}</td>
+              <td>{{ formatDate(row.transactionDate) }}</td>
+              <td>{{ getTotalItems(row) }} item</td>
+              <td class="col-price">Rp {{ formatPrice(row.totalHarga) }}</td>
             </tr>
           </tbody>
         </table>
@@ -174,7 +176,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import { apiGetTransactions, apiGetProducts, apiGetAprioriHistory } from '../api'
+import type { TransactionRes } from '../api'
 
 const props = defineProps<{
   username: string
@@ -216,13 +220,27 @@ const chartDays = computed(() => {
   return days
 })
 
+// ── Stats ──
+const totalProduk = ref<string>('—')
+const transaksiHariIni = ref<string>('—')
+const rekomendasiAktif = ref<string>('—')
+const loadingTransactions = ref(false)
+
+const formatPrice = (val: number) => val?.toLocaleString('id-ID') ?? '0'
+const formatDate = (dateString: string) => {
+  if (!dateString) return '-'
+  const d = new Date(dateString)
+  return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+}
+const getTotalItems = (trx: TransactionRes) => trx.details?.reduce((sum, d) => sum + d.jumlah, 0) ?? 0
+
 // ── Stat Cards ──
-const statCards = [
+const statCards = computed(() => [
   {
     id: 'produk',
     label: 'Total Produk',
-    value: '—',
-    trend: 'Belum tersambung',
+    value: totalProduk.value,
+    trend: 'Semua produk aktif',
     trendType: 'neutral',
     iconBg: 'linear-gradient(135deg,#2456A4,#3b82f6)',
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
@@ -232,9 +250,9 @@ const statCards = [
   {
     id: 'transaksi',
     label: 'Transaksi Hari Ini',
-    value: '—',
-    trend: 'Belum tersambung',
-    trendType: 'neutral',
+    value: transaksiHariIni.value,
+    trend: 'Transaksi masuk hari ini',
+    trendType: 'up',
     iconBg: 'linear-gradient(135deg,#0ea5e9,#38bdf8)',
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
       <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
@@ -245,8 +263,8 @@ const statCards = [
     id: 'stok',
     label: 'Stok Menipis',
     value: '—',
-    trend: 'Belum tersambung',
-    trendType: 'neutral',
+    trend: 'Perlu restok segera',
+    trendType: 'down',
     iconBg: 'linear-gradient(135deg,#f59e0b,#fbbf24)',
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
@@ -256,15 +274,15 @@ const statCards = [
   {
     id: 'rekomendasi',
     label: 'Rekomendasi Aktif',
-    value: '—',
-    trend: 'Belum tersambung',
-    trendType: 'neutral',
+    value: rekomendasiAktif.value,
+    trend: 'Berdasarkan analisis terbaru',
+    trendType: 'up',
     iconBg: 'linear-gradient(135deg,#10b981,#34d399)',
     icon: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2">
       <polyline points="22,12 18,12 15,21 9,3 6,12 2,12"/>
     </svg>`,
   },
-]
+])
 
 // ── Quick Actions ──
 const quickActions = [
@@ -320,14 +338,41 @@ const quickActions = [
   },
 ]
 
-// ── Recent Transactions (placeholder) ──
-const recentTransactions = [
-  { id: 'TRX-2026-001', date: '02 Jul 2026', items: 4, total: 'Rp 185.000', status: 'Selesai',  statusClass: 'badge-success' },
-  { id: 'TRX-2026-002', date: '02 Jul 2026', items: 2, total: 'Rp  92.500', status: 'Selesai',  statusClass: 'badge-success' },
-  { id: 'TRX-2026-003', date: '01 Jul 2026', items: 7, total: 'Rp 340.000', status: 'Selesai',  statusClass: 'badge-success' },
-  { id: 'TRX-2026-004', date: '01 Jul 2026', items: 1, total: 'Rp  45.000', status: 'Selesai',  statusClass: 'badge-success' },
-  { id: 'TRX-2026-005', date: '30 Jun 2026', items: 5, total: 'Rp 210.000', status: 'Selesai',  statusClass: 'badge-success' },
-]
+// ── Recent Transactions (from API) ──
+const recentTransactions = ref<TransactionRes[]>([])
+
+onMounted(async () => {
+  // 1. Total produk
+  try {
+    const produkRes = await apiGetProducts(0, 1)
+    totalProduk.value = produkRes.totalElements?.toLocaleString('id-ID') ?? '—'
+  } catch { totalProduk.value = '—' }
+
+  // 2. Transaksi hari ini
+  try {
+    const today = new Date().toISOString().slice(0, 10)
+    const txRes = await apiGetTransactions(0, 1, today, today)
+    transaksiHariIni.value = txRes.totalElements?.toLocaleString('id-ID') ?? '0'
+  } catch { transaksiHariIni.value = '—' }
+
+  // 3. Rekomendasi aktif dari history apriori terbaru
+  try {
+    const history = await apiGetAprioriHistory()
+    if (history && history.length > 0) {
+      rekomendasiAktif.value = '✓ Ada'
+    } else {
+      rekomendasiAktif.value = '—'
+    }
+  } catch { rekomendasiAktif.value = '—' }
+
+  // 4. 5 transaksi terbaru
+  try {
+    loadingTransactions.value = true
+    const txRes = await apiGetTransactions(0, 5)
+    recentTransactions.value = txRes.content || []
+  } catch { recentTransactions.value = [] }
+  finally { loadingTransactions.value = false }
+})
 </script>
 
 <style scoped>
