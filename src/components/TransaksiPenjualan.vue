@@ -132,7 +132,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { apiGetProducts, apiCreateTransaction } from '../api'
+import { apiGetProductsList, apiCreateTransaction } from '../api'
 import type { ProductResponse, TransactionReq } from '../api'
 
 const products = ref<ProductResponse[]>([])
@@ -149,7 +149,7 @@ const kodeTransaksi = ref(`TRX${Date.now().toString().slice(-6)}`)
 
 onMounted(async () => {
   try {
-    products.value = await apiGetProducts()
+    products.value = await apiGetProductsList()
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : 'Gagal memuat daftar produk'
   }

@@ -45,15 +45,21 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(item, idx) in paginatedData" :key="idx">
-              <td>{{ idx + 1 }}</td>
-              <td>{{ item.tanggalMulai }}</td>
-              <td>{{ item.tanggalBerakhir }}</td>
+            <tr v-if="loading">
+              <td colspan="6" class="text-center py-8">Memuat riwayat analisa...</td>
+            </tr>
+            <tr v-else-if="paginatedData.length === 0">
+              <td colspan="6" class="text-center py-8">Tidak ada hasil analisa.</td>
+            </tr>
+            <tr v-else v-for="(item, idx) in paginatedData" :key="idx">
+              <td>{{ (currentPage - 1) * itemsPerPage + idx + 1 }}</td>
+              <td>{{ item.tglMulai }}</td>
+              <td>{{ item.tglSelesai }}</td>
               <td>{{ item.minSupport }}%</td>
               <td>{{ item.minConfidence }}%</td>
               <td>
                 <div class="action-buttons">
-                  <button class="btn-action view" title="Lihat Detail">
+                  <button class="btn-action view" title="Lihat Detail" @click="openDetail(item.id)">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
                   </button>
                   <button class="btn-action delete" title="Hapus">
@@ -100,17 +106,129 @@
         </div>
       </div>
     </div>
+    
+    <!-- Modal Detail Analisa -->
+    <div class="modal-backdrop" v-if="showDetailModal">
+      <div class="modal-content modal-xl">
+        <div class="modal-header">
+          <h2 class="modal-title">Detail Hasil Analisa <span class="text-blue-500">#{{ selectedDetail?.id }}</span></h2>
+          <button class="modal-close" @click="closeDetail">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <div v-if="modalLoading" class="text-center py-8">Memuat detail...</div>
+          <div v-else-if="selectedDetail">
+             <div class="summary-grid mb-6">
+               <div class="summary-item">
+                 <span class="summary-label">Periode Analisis:</span>
+                 <span class="summary-value">{{ selectedDetail.tglMulai }} s/d {{ selectedDetail.tglSelesai }}</span>
+               </div>
+               <div class="summary-item">
+                 <span class="summary-label">Total Transaksi:</span>
+                 <span class="summary-value">{{ selectedDetail.totalTransaksi }}</span>
+               </div>
+               <div class="summary-item">
+                 <span class="summary-label">Min. Support:</span>
+                 <span class="summary-value">{{ selectedDetail.minSupport }}%</span>
+               </div>
+               <div class="summary-item">
+                 <span class="summary-label">Min. Confidence:</span>
+                 <span class="summary-value">{{ selectedDetail.minConfidence }}%</span>
+               </div>
+             </div>
+             
+             <h3 class="section-title">Association Rules</h3>
+             <div class="table-container mb-6">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>No</th>
+                      <th>Aturan (Antecedent -> Consequent)</th>
+                      <th>Support</th>
+                      <th>Confidence</th>
+                      <th>Keterangan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(rule, i) in selectedDetail.associationRules" :key="i">
+                      <td>{{ i + 1 }}</td>
+                      <td>{{ rule.antecedent }} -> {{ rule.consequent }}</td>
+                      <td>{{ rule.support.toFixed(2) }}%</td>
+                      <td>{{ rule.confidence.toFixed(2) }}%</td>
+                      <td>
+                        <span :class="rule.lolosFilter ? 'text-success' : 'text-danger'">
+                           {{ rule.lolosFilter ? 'Lolos' : 'Tidak Lolos' }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr v-if="!selectedDetail.associationRules?.length">
+                       <td colspan="5" class="text-center">Tidak ada aturan.</td>
+                    </tr>
+                  </tbody>
+                </table>
+             </div>
+             
+             <h3 class="section-title">Frequent Itemsets</h3>
+             <div class="table-container">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Level</th>
+                      <th>Itemset</th>
+                      <th>Support</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, i) in selectedDetail.frequentItemsets" :key="i">
+                      <td>Itemset {{ item.level }}</td>
+                      <td>{{ item.item }}</td>
+                      <td>{{ item.support.toFixed(2) }}%</td>
+                      <td>
+                        <span :class="item.keterangan === 'Lolos' ? 'text-success' : 'text-danger'">
+                           {{ item.keterangan }}
+                        </span>
+                      </td>
+                    </tr>
+                    <tr v-if="!selectedDetail.frequentItemsets?.length">
+                       <td colspan="4" class="text-center">Tidak ada itemset.</td>
+                    </tr>
+                  </tbody>
+                </table>
+             </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { apiGetAprioriHistory, apiGetAprioriHistoryDetail } from '../api'
+import type { AprioriHistorySummaryRes, AprioriHistoryDetailRes } from '../api'
 
-const dummyData = ref([
-  { tanggalMulai: '24 Dec 2024', tanggalBerakhir: '24 Dec 2024', minSupport: 5, minConfidence: 5 },
-  { tanggalMulai: '24 Dec 2024', tanggalBerakhir: '24 Dec 2024', minSupport: 10, minConfidence: 10 },
-  { tanggalMulai: '24 Dec 2024', tanggalBerakhir: '24 Dec 2024', minSupport: 20, minConfidence: 20 },
-])
+const historyData = ref<AprioriHistorySummaryRes[]>([])
+const loading = ref(false)
+const errorMsg = ref('')
+
+const loadData = async () => {
+  try {
+    loading.value = true
+    errorMsg.value = ''
+    const res = await apiGetAprioriHistory()
+    historyData.value = res
+  } catch(e) {
+    errorMsg.value = e instanceof Error ? e.message : 'Gagal memuat history'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadData()
+})
 
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
@@ -119,11 +237,11 @@ watch(itemsPerPage, () => {
   currentPage.value = 1
 })
 
-const totalPages = computed(() => Math.ceil(dummyData.value.length / itemsPerPage.value))
+const totalPages = computed(() => Math.ceil(historyData.value.length / itemsPerPage.value))
 
 const paginatedData = computed(() => {
   const start = (currentPage.value - 1) * itemsPerPage.value
-  return dummyData.value.slice(start, start + itemsPerPage.value)
+  return historyData.value.slice(start, start + itemsPerPage.value)
 })
 
 const visiblePages = computed(() => {
@@ -144,6 +262,30 @@ const visiblePages = computed(() => {
   
   return [1, '...', current - 1, current, current + 1, '...', total]
 })
+
+// Modal Logic
+const showDetailModal = ref(false)
+const selectedDetail = ref<AprioriHistoryDetailRes | null>(null)
+const modalLoading = ref(false)
+
+const openDetail = async (id: number) => {
+  try {
+    modalLoading.value = true
+    showDetailModal.value = true
+    selectedDetail.value = null
+    const res = await apiGetAprioriHistoryDetail(id)
+    selectedDetail.value = res
+  } catch(e) {
+    console.error(e)
+  } finally {
+    modalLoading.value = false
+  }
+}
+
+const closeDetail = () => {
+  showDetailModal.value = false
+  selectedDetail.value = null
+}
 </script>
 
 <style scoped>
@@ -357,4 +499,69 @@ const visiblePages = computed(() => {
 }
 .page-btn.dots { border: none; cursor: default; background: transparent; }
 .page-nav:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Modal and Detail Styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 95%; max-width: 800px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex; flex-direction: column; max-height: 90vh;
+}
+.modal-xl { max-width: 900px; }
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0f4f8;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-title { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; }
+.modal-close {
+  background: transparent; border: none; color: #64748b;
+  cursor: pointer; padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #f1f5f9; color: #0f172a; }
+.modal-body { 
+  padding: 24px;
+  overflow-y: auto;
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+.summary-item {
+  display: flex; flex-direction: column; gap: 4px;
+}
+.summary-label {
+  font-size: 12px; color: #64748b; font-weight: 600;
+}
+.summary-value {
+  font-size: 14px; font-weight: 700; color: #1e293b;
+}
+.section-title {
+  font-size: 16px; font-weight: 800; color: #1e293b; margin: 0 0 12px;
+}
+.mb-6 { margin-bottom: 24px; }
+.table-container {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.text-success { color: #10b981; font-weight: 600; }
+.text-danger { color: #ef4444; font-weight: 600; }
+.text-blue-500 { color: #3b82f6; }
 </style>

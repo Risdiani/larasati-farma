@@ -251,18 +251,37 @@ export interface ProductRequest {
   isActive: boolean
 }
 
-export const apiGetProducts = async (): Promise<ProductResponse[]> => {
-  const res = await fetch(`${BASE_URL}/products`, {
+export const apiGetProducts = async (page: number = 0, size: number = 10, nama?: string, kategori?: string): Promise<PaginatedData<ProductResponse>> => {
+  const params = new URLSearchParams()
+  params.append('page', page.toString())
+  params.append('size', size.toString())
+  if (nama) params.append('nama', nama)
+  if (kategori) params.append('kategori', kategori)
+
+  const res = await fetch(`${BASE_URL}/products?${params.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+  })
+  const json: BaseResponse<PaginatedData<ProductResponse>> = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat produk')
+  return json.data
+}
+
+export const apiGetProductsList = async (nama?: string): Promise<ProductResponse[]> => {
+  const params = new URLSearchParams()
+  if (nama) params.append('nama', nama)
+
+  const res = await fetch(`${BASE_URL}/products/list?${params.toString()}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json', ...authHeader() },
   })
   const json: BaseResponse<ProductResponse[]> = await res.json()
-  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat produk')
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat produk list')
   return Array.isArray(json.data) ? json.data : ((json.data as any).content || [])
 }
 
-export const apiGetProduct = async (id: number): Promise<ProductResponse> => {
-  const res = await fetch(`${BASE_URL}/products/${id}`, {
+export const apiGetProduct = async (kodeProduk: string): Promise<ProductResponse> => {
+  const res = await fetch(`${BASE_URL}/products/${kodeProduk}`, {
     method: 'GET',
     headers: { 'Content-Type': 'application/json', ...authHeader() },
   })
@@ -475,8 +494,8 @@ export interface AprioriReq {
   processId: number
   minSupport: number
   minConfidence: number
-  startDate: string // YYYY-MM-DD
-  endDate: string   // YYYY-MM-DD
+  startDate: string // DD/MM/YYYY
+  endDate: string   // DD/MM/YYYY
 }
 
 export interface AprioriItemsetRes {
@@ -542,5 +561,66 @@ export const apiGetRules = async (body: AprioriReq): Promise<AprioriProcessRes<A
   })
   const json = await res.json()
   if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memproses Rule Apriori')
+  return json.data
+}
+
+export interface AprioriHistorySummaryRes {
+  id: number
+  namaProses: string
+  minSupport: number
+  minConfidence: number
+  tglMulai: string
+  tglSelesai: string
+  totalTransaksi: number
+  status: string
+  executedBy: string
+  createdAt: string
+}
+
+export interface AprioriHistoryItemsetRes {
+  level: number
+  item: string
+  supportCount: number
+  support: number
+  keterangan: string
+}
+
+export interface AprioriHistoryRuleRes {
+  itemsetLevel: number
+  antecedent: string
+  consequent: string
+  supportCountXy: number
+  supportCountX: number
+  supportCountY: number
+  support: number
+  confidence: number
+  lift: number
+  lolosFilter: boolean
+  korelasi: string
+  keterangan: string
+}
+
+export interface AprioriHistoryDetailRes extends AprioriHistorySummaryRes {
+  frequentItemsets: AprioriHistoryItemsetRes[]
+  associationRules: AprioriHistoryRuleRes[]
+}
+
+export const apiGetAprioriHistory = async (): Promise<AprioriHistorySummaryRes[]> => {
+  const res = await fetch(`${BASE_URL}/apriori/history`, {
+    method: 'GET',
+    headers: { ...authHeader() }
+  })
+  const json = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal mengambil riwayat Apriori')
+  return json.data
+}
+
+export const apiGetAprioriHistoryDetail = async (id: number): Promise<AprioriHistoryDetailRes> => {
+  const res = await fetch(`${BASE_URL}/apriori/history/${id}`, {
+    method: 'GET',
+    headers: { ...authHeader() }
+  })
+  const json = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal mengambil detail riwayat Apriori')
   return json.data
 }

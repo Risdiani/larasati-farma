@@ -61,10 +61,10 @@
             <tr>
               <th style="width: 15%">ID Transaksi</th>
               <th style="width: 15%">Tanggal</th>
-              <th style="width: 30%">Nama Produk</th>
-              <th style="width: 15%">Harga Satuan</th>
-              <th style="width: 10%">Jumlah</th>
-              <th style="width: 15%">Subtotal</th>
+              <th style="width: 20%">Sumber Data</th>
+              <th style="width: 15%">Total Item</th>
+              <th style="width: 20%">Total Harga</th>
+              <th style="width: 15%" class="text-center">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -81,15 +81,15 @@
             </tr>
             <tr v-else v-for="(item, index) in paginatedData" :key="index">
               <td class="text-blue-500 font-medium">{{ item.kodeTransaksi }}</td>
-              <td class="text-slate-600">{{ formatDate(item.tanggal) }}</td>
-              <td>
-                <div class="product-info">
-                  <span class="font-bold text-slate-800">{{ item.namaProduk }}</span>
-                </div>
+              <td class="text-slate-600">{{ formatDate(item.transactionDate) }}</td>
+              <td class="text-slate-600">{{ item.sumberData || 'Manual' }}</td>
+              <td class="text-slate-600">{{ getTotalQty(item) }}</td>
+              <td class="text-slate-600 font-bold">Rp {{ formatPrice(item.totalHarga) }}</td>
+              <td class="text-center">
+                <button class="btn-action view" @click="openDetailModal(item)" title="Lihat Detail">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
               </td>
-              <td class="text-slate-600">Rp {{ formatPrice(item.hargaSatuan) }}</td>
-              <td class="text-slate-600">{{ formatQty(item.jumlah) }}</td>
-              <td class="text-slate-600">Rp {{ formatPrice(item.subtotal) }}</td>
             </tr>
           </tbody>
         </table>
@@ -137,27 +137,58 @@
       </div>
       </div>
     </div>
+    <!-- Modal Detail Transaksi -->
+    <div class="modal-backdrop" v-if="showDetailModal">
+      <div class="modal-content modal-lg">
+        <div class="modal-header">
+          <h2 class="modal-title">Detail Transaksi: <span class="text-blue-500">{{ selectedTransaction?.kodeTransaksi }}</span></h2>
+          <button class="modal-close" @click="closeDetailModal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="modal-body p-0">
+          <div class="table-container m-0 border-0 rounded-none">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>No</th>
+                  <th>Nama Produk</th>
+                  <th>Harga Satuan</th>
+                  <th>Jumlah</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(detail, idx) in selectedTransaction?.details || []" :key="idx">
+                  <td>{{ idx + 1 }}</td>
+                  <td class="font-bold text-slate-800">{{ detail.namaProduk }}</td>
+                  <td>Rp {{ formatPrice(detail.hargaSatuan) }}</td>
+                  <td>{{ formatQty(detail.jumlah) }}</td>
+                  <td>Rp {{ formatPrice(detail.subtotal) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="p-5 flex justify-end items-center bg-slate-50 border-t border-slate-100">
+            <span class="mr-4 text-slate-500">Total Harga:</span>
+            <span class="text-xl font-bold text-slate-800">Rp {{ formatPrice(selectedTransaction?.totalHarga || 0) }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { apiGetTransactions, apiImportExcelTransaction } from '../api'
+import type { TransactionRes } from '../api'
 
 const emit = defineEmits<{
   (e: 'navigate', page: string): void
 }>()
 
-interface FlatTransaction {
-  kodeTransaksi: string
-  tanggal: string
-  namaProduk: string
-  hargaSatuan: number
-  jumlah: number
-  subtotal: number
-}
-
-const paginatedData = ref<FlatTransaction[]>([])
+const paginatedData = ref<TransactionRes[]>([])
 const totalPages = ref(1)
 const loading = ref(true)
 const uploading = ref(false)
@@ -203,25 +234,8 @@ const loadData = async () => {
     const res = await apiGetTransactions(pageIndex, itemsPerPage.value, startDate.value || undefined, endDate.value || undefined)
     
     totalPages.value = res.totalPages
-    
-    const flattened: FlatTransaction[] = []
-    const transactionsList = res.content || []
-    
-    transactionsList.forEach(trx => {
-      const detailsList = Array.isArray(trx.details) ? trx.details : []
-      detailsList.forEach(detail => {
-        flattened.push({
-          kodeTransaksi: trx.kodeTransaksi,
-          tanggal: trx.transactionDate,
-          namaProduk: detail.namaProduk,
-          hargaSatuan: detail.hargaSatuan,
-          jumlah: detail.jumlah,
-          subtotal: detail.subtotal
-        })
-      })
-    })
-    
-    paginatedData.value = flattened
+    totalPages.value = res.totalPages
+    paginatedData.value = res.content || []
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : 'Gagal memuat data'
   } finally {
@@ -232,6 +246,25 @@ const loadData = async () => {
 onMounted(() => {
   loadData()
 })
+
+// Modal Detail Logic
+const showDetailModal = ref(false)
+const selectedTransaction = ref<TransactionRes | null>(null)
+
+const openDetailModal = (item: TransactionRes) => {
+  selectedTransaction.value = item
+  showDetailModal.value = true
+}
+
+const closeDetailModal = () => {
+  showDetailModal.value = false
+  selectedTransaction.value = null
+}
+
+const getTotalQty = (item: TransactionRes) => {
+  if (!item.details) return 0
+  return item.details.reduce((sum, d) => sum + d.jumlah, 0)
+}
 
 const triggerFileInput = () => {
   if (fileInput.value) {
@@ -552,4 +585,60 @@ const formatQty = (qty: number) => {
   border-radius: 50%; animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Modal Styles */
+.modal-backdrop {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-content {
+  background: #fff;
+  border-radius: 16px;
+  width: 90%; max-width: 500px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.modal-lg { max-width: 700px; }
+.modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #f0f4f8;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-title { font-size: 18px; font-weight: 800; color: #1e293b; margin: 0; }
+.modal-close {
+  background: transparent; border: none; color: #64748b;
+  cursor: pointer; padding: 4px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-close:hover { background: #f1f5f9; color: #0f172a; }
+.modal-body { 
+  padding: 24px;
+  overflow-y: auto;
+}
+.p-0 { padding: 0 !important; }
+.m-0 { margin: 0 !important; }
+.border-0 { border: none !important; }
+.rounded-none { border-radius: 0 !important; }
+.flex { display: flex; }
+.justify-end { justify-content: flex-end; }
+.items-center { align-items: center; }
+.bg-slate-50 { background-color: #f8fafc; }
+.border-t { border-top: 1px solid #f0f4f8; }
+.p-5 { padding: 20px; }
+.text-xl { font-size: 20px; }
+.btn-action.view { background: #eff6ff; color: #3b82f6; }
+.btn-action.view:hover { background: #dbeafe; }
+.btn-action {
+  width: 32px; height: 32px;
+  border-radius: 6px; border: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.2s; margin: 0 2px;
+}
 </style>

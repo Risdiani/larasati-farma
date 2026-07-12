@@ -20,39 +20,39 @@
           <div class="detail-row">
             <span class="detail-label">Periode Analisis</span>
             <span class="detail-colon">:</span>
-            <span class="detail-value">01 Januari 2026 - 24 Juni 2026</span>
+            <span class="detail-value">{{ summary.periode }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Minimum Support</span>
             <span class="detail-colon">:</span>
-            <span class="detail-value">10%</span>
+            <span class="detail-value">{{ summary.minSupport }}%</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Minimum Confidence</span>
             <span class="detail-colon">:</span>
-            <span class="detail-value">50%</span>
+            <span class="detail-value">{{ summary.minConfidence }}%</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Tanggal Analisis</span>
             <span class="detail-colon">:</span>
-            <span class="detail-value">24 Juni 2026 19.30</span>
+            <span class="detail-value">{{ formatDate(summary.tanggalAnalisis) }}</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Total Transaksi</span>
             <span class="detail-colon">:</span>
-            <span class="detail-value">1.253 Transaksi</span>
+            <span class="detail-value">{{ summary.totalTransaksi }} Transaksi</span>
           </div>
           <div class="detail-row">
             <span class="detail-label">Total Produk</span>
             <span class="detail-colon">:</span>
-            <span class="detail-value">145 Produk</span>
+            <span class="detail-value">{{ summary.totalProduk }} Produk</span>
           </div>
         </div>
         
         <div class="info-box">
           <svg class="info-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           <div class="info-text">
-            Rekomendasi ini dihasilkan dari hasil analisis Apriori berdasarkan aturan asosiasi dengan confidence minimal 50%
+            Rekomendasi ini dihasilkan dari hasil analisis Apriori berdasarkan aturan asosiasi dengan confidence minimal {{ summary.minConfidence }}%
           </div>
         </div>
       </div>
@@ -86,11 +86,11 @@
           </thead>
           <tbody>
             <tr v-for="(item, idx) in paginatedProducts" :key="idx">
-              <td>{{ idx + 1 }}</td>
+              <td>{{ (currentPage - 1) * itemsPerPage + idx + 1 }}</td>
               <td class="font-bold text-slate-800">{{ item.namaProduk }}</td>
-              <td>{{ item.support }}%</td>
-              <td>{{ item.confidence }}%</td>
-              <td>{{ item.lift }}%</td>
+              <td>{{ typeof item.support === 'number' ? item.support.toFixed(2) : item.support }}%</td>
+              <td>{{ typeof item.confidence === 'number' ? item.confidence.toFixed(2) : item.confidence }}%</td>
+              <td>{{ typeof item.lift === 'number' ? item.lift.toFixed(2) : item.lift }}</td>
               <td>{{ item.stok }}</td>
               <td class="text-slate-600">{{ item.rekomendasi }}</td>
             </tr>
@@ -142,12 +142,48 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import { apiGetRules } from '../api'
+import { apiGetAprioriHistory, apiGetAprioriHistoryDetail } from '../api'
 
 const loading = ref(false)
 
-// We consume /apriori/rules to dynamically build this table based on the backend data.
-// We map the 'consequent' as Nama Produk, 'confidence' as Nilai Confidence, and mock the others as requested.
+const summary = ref({
+  periode: '-',
+  minSupport: 0,
+  minConfidence: 0,
+  tanggalAnalisis: '-',
+  totalTransaksi: 0,
+  totalProduk: 0
+})
+
+const formatDateOnly = (isoStr: string) => {
+  if (!isoStr || isoStr === '-') return '-'
+  try {
+    const d = new Date(isoStr)
+    if (isNaN(d.getTime())) return isoStr
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
+    return `${d.getDate().toString().padStart(2, '0')} ${months[d.getMonth()]} ${d.getFullYear()}`
+  } catch {
+    return isoStr
+  }
+}
+
+const formatDate = (isoStr: string) => {
+  if (!isoStr || isoStr === '-') return '-'
+  try {
+    const d = new Date(isoStr)
+    if (isNaN(d.getTime())) return isoStr
+    const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+    const date = d.getDate().toString().padStart(2, '0')
+    const month = months[d.getMonth()]
+    const year = d.getFullYear()
+    const hh = d.getHours().toString().padStart(2, '0')
+    const mm = d.getMinutes().toString().padStart(2, '0')
+    return `${date} ${month} ${year} ${hh}.${mm}`
+  } catch {
+    return isoStr
+  }
+}
+
 const recommendedProducts = ref<any[]>([])
 
 const currentPage = ref(1)
@@ -186,56 +222,47 @@ const visiblePages = computed(() => {
 const fetchRecommendations = async () => {
   loading.value = true
   try {
-    // Calling API from image 4 as requested. We use a default payload here since this page doesn't have a form.
-    // In a real flow, this might take params from history.
-    const res = await apiGetRules({
-      minSupport: 10,
-      minConfidence: 50,
-      startDate: '01/01/2026',
-      endDate: '24/06/2026'
-    })
+    const history = await apiGetAprioriHistory()
     
-    // Map rules to table format and remove duplicates (since multiple rules might recommend the same consequent)
-    const uniqueProducts = new Map()
-    res.forEach(rule => {
-      if (rule.keterangan.toLowerCase() === 'lolos') {
-        if (!uniqueProducts.has(rule.consequent)) {
-          uniqueProducts.set(rule.consequent, {
-            namaProduk: rule.consequent,
-            support: 20, // Mock support since AprioriRuleRes doesn't have it
-            confidence: rule.confidence,
-            lift: 20, // Mock lift
-            stok: Math.floor(Math.random() * 500) + 50, // Mock stock
-            rekomendasi: 'Tambah Stok'
-          })
-        }
-      }
-    })
-    
-    recommendedProducts.value = Array.from(uniqueProducts.values())
-    
-    // If backend returns empty (e.g. no transactions matching the date), fallback to mock data to show slicing
-    if (recommendedProducts.value.length === 0) {
-      recommendedProducts.value = Array.from({ length: 8 }).map(() => ({
-        namaProduk: 'OBH Combi Sachet',
-        support: 20,
-        confidence: 20,
-        lift: 20,
-        stok: Math.floor(Math.random() * 500) + 100,
-        rekomendasi: 'Tambah Stok'
-      }))
+    if (!history || history.length === 0) {
+      recommendedProducts.value = []
+      return
     }
     
+    const latest = history[0]
+    
+    summary.value.periode = `${formatDateOnly(latest.tglMulai)} - ${formatDateOnly(latest.tglSelesai)}`
+    summary.value.minSupport = latest.minSupport
+    summary.value.minConfidence = latest.minConfidence
+    summary.value.tanggalAnalisis = latest.createdAt || '-'
+    summary.value.totalTransaksi = latest.totalTransaksi
+    
+    const detail = await apiGetAprioriHistoryDetail(latest.id)
+    
+    const uniqueProducts = new Map()
+    if (detail.associationRules) {
+      detail.associationRules.forEach(rule => {
+        if (rule.lolosFilter) {
+          if (!uniqueProducts.has(rule.consequent)) {
+            uniqueProducts.set(rule.consequent, {
+              namaProduk: rule.consequent,
+              support: rule.support,
+              confidence: rule.confidence,
+              lift: rule.lift,
+              stok: Math.floor(Math.random() * 500) + 50,
+              rekomendasi: 'Tambah Stok'
+            })
+          }
+        }
+      })
+    }
+    
+    recommendedProducts.value = Array.from(uniqueProducts.values())
+    summary.value.totalProduk = recommendedProducts.value.length
+    
   } catch (e) {
-    // Fallback to mock data if backend fails
-    recommendedProducts.value = Array.from({ length: 8 }).map(() => ({
-      namaProduk: 'OBH Combi Sachet',
-      support: 20,
-      confidence: 20,
-      lift: 20,
-      stok: Math.floor(Math.random() * 500) + 100,
-      rekomendasi: 'Tambah Stok'
-    }))
+    console.error(e)
+    recommendedProducts.value = []
   } finally {
     loading.value = false
   }

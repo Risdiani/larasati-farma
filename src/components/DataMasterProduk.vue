@@ -77,12 +77,12 @@
                 {{ errorMsg }}
               </td>
             </tr>
-            <tr v-else-if="paginatedData.length === 0">
+            <tr v-else-if="products.length === 0">
               <td colspan="9" class="text-center py-8 text-slate-500">
                 Tidak ada data produk yang sesuai.
               </td>
             </tr>
-            <tr v-else v-for="item in paginatedData" :key="item.id">
+            <tr v-else v-for="item in products" :key="item.id">
               <td class="font-medium text-slate-600">{{ item.kodeProduk }}</td>
               <td class="font-bold text-slate-800">{{ item.namaProduk }}</td>
               <td>{{ item.kategori || '-' }}</td>
@@ -262,16 +262,19 @@ const form = ref<ProductRequest>({
   isActive: true
 })
 
+const totalPages = ref(1)
+
 // Load initial data
 const loadData = async () => {
   try {
     loading.value = true
     errorMsg.value = ''
-    const [prods, cats] = await Promise.all([
-      apiGetProducts(),
+    const [prodsRes, cats] = await Promise.all([
+      apiGetProducts(currentPage.value - 1, itemsPerPage.value, searchQuery.value || undefined, filterCategory.value || undefined),
       apiGetCategories()
     ])
-    products.value = prods
+    products.value = prodsRes.content
+    totalPages.value = prodsRes.totalPages
     categories.value = cats
   } catch (e: unknown) {
     errorMsg.value = e instanceof Error ? e.message : 'Gagal memuat data'
@@ -284,34 +287,19 @@ onMounted(() => {
   loadData()
 })
 
-// Computed Filter & Pagination
-const filteredData = computed(() => {
-  let result = products.value
-
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(p => 
-      p.namaProduk.toLowerCase().includes(q) || 
-      p.kodeProduk.toLowerCase().includes(q)
-    )
-  }
-
-  if (filterCategory.value) {
-    result = result.filter(p => p.kategori === filterCategory.value)
-  }
-
-  return result
-})
-
-const totalPages = computed(() => Math.ceil(filteredData.value.length / itemsPerPage.value))
-const paginatedData = computed(() => {
-  const start = (currentPage.value - 1) * itemsPerPage.value
-  return filteredData.value.slice(start, start + itemsPerPage.value)
-})
-
 watch([searchQuery, filterCategory, itemsPerPage], () => {
-  currentPage.value = 1
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  } else {
+    loadData()
+  }
 })
+
+watch(currentPage, () => {
+  loadData()
+})
+
+
 
 const visiblePages = computed(() => {
   const current = currentPage.value
