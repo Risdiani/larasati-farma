@@ -77,6 +77,12 @@
         @navigate="activePage = $event"
       />
 
+      <!-- Informasi Mutasi Stok -->
+      <InformasiMutasiStok
+        v-else-if="activePage === 'informasi-mutasi-stok'"
+        key="informasi-mutasi-stok"
+      />
+
       <!-- Proses Algoritma Apriori -->
       <ProsesApriori
         v-else-if="activePage === 'proses-apriori'"
@@ -136,6 +142,7 @@ import ProsesApriori from './components/ProsesApriori.vue'
 import HasilAnalisa from './components/HasilAnalisa.vue'
 import RekomendasiPengadaan from './components/RekomendasiPengadaan.vue'
 import LaporanPenjualan from './components/LaporanPenjualan.vue'
+import InformasiMutasiStok from './components/InformasiMutasiStok.vue'
 import { getToken, getUserId, apiGetUser } from './api'
 
 // ── App State ──
@@ -180,7 +187,7 @@ const pageLabels: Record<string, string> = {
   'data-master-kategori': 'Data Master Kategori',
   'transaksi-penjualan': 'Transaksi Penjualan',
   'riwayat-transaksi': 'Riwayat Transaksi',
-  'manajemen-stok': 'Manajemen Stok',
+  'informasi-mutasi-stok': 'Informasi Mutasi Stok',
   'analisis-apriori': 'Analisis Apriori',
   'rekomendasi-pengadaan': 'Rekomendasi Pengadaan',
   'laporan-penjualan': 'Laporan Penjualan',

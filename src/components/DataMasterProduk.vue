@@ -97,6 +97,9 @@
               <td>0</td> 
               <td>{{ formatDate(item.createdAt) }}</td>
               <td class="col-actions">
+                <button class="btn-action add-stock" @click="openStockModal(item)" title="Tambah Stok">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                </button>
                 <button class="btn-action edit" @click="openEditModal(item)" title="Edit">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
@@ -154,9 +157,13 @@
         
         <form @submit.prevent="submitForm" class="modal-body">
           <div class="form-grid">
-            <div class="form-group">
+            <div class="form-group" v-if="isEditMode">
               <label>Kode Produk <span class="req">*</span></label>
               <input type="text" v-model="form.kodeProduk" class="form-input" required :disabled="isEditMode" />
+            </div>
+            <div class="form-group" v-if="!isEditMode">
+              <label>Qty<span class="req">*</span></label>
+              <input type="number" v-model="form.qty" class="form-input" required min="1" />
             </div>
             <div class="form-group">
               <label>Nama Produk <span class="req">*</span></label>
@@ -225,12 +232,46 @@
       </div>
     </div>
 
+    <!-- ── Modal Tambah Stok ── -->
+    <div class="modal-backdrop" v-if="showStockModal">
+      <div class="modal-content modal-sm">
+        <div class="modal-header">
+          <h2 class="modal-title">Tambah Stok</h2>
+          <button class="modal-close" @click="closeStockModal">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <form @submit.prevent="submitStockForm" class="modal-body">
+          <div class="form-group mb-4">
+            <label>Kode Produk</label>
+            <input type="text" :value="stockForm.kodeProduk" class="form-input" disabled />
+          </div>
+          <div class="form-group mb-4">
+            <label>Qty<span class="req">*</span></label>
+            <input type="number" v-model="stockForm.qty" class="form-input" required min="1" />
+          </div>
+          <div class="form-group mb-4">
+            <label>Keterangan<span class="req">*</span></label>
+            <input type="text" v-model="stockForm.keterangan" class="form-input" maxlength="255" required/>
+          </div>
+          <div v-if="modalError" class="modal-error mb-4">{{ modalError }}</div>
+          <div class="modal-footer">
+            <button type="button" class="btn-cancel" @click="closeStockModal" :disabled="submitting">Batal</button>
+            <button type="submit" class="btn-save" :disabled="submitting">
+              <span v-if="submitting" class="btn-spinner"></span>
+              <span v-else>Simpan</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { apiGetProducts, apiGetCategories, apiCreateProduct, apiUpdateProduct, apiDeleteProduct } from '../api'
+import { apiGetProducts, apiGetCategories, apiCreateProduct, apiUpdateProduct, apiDeleteProduct, apiAddStock } from '../api'
 import type { ProductResponse, CategoryResponse, ProductRequest } from '../api'
 
 const products = ref<ProductResponse[]>([])
@@ -259,8 +300,18 @@ const form = ref<ProductRequest>({
   kategoriId: null,
   satuan: '',
   harga: 0,
-  isActive: true
+  isActive: true,
+  qty: 1
 })
+
+const showStockModal = ref(false)
+const stockForm = ref({
+  kodeProduk: '',
+  qty: 1,
+  tipe: 'MASUK',
+  keterangan:''
+})
+
 
 const totalPages = ref(1)
 
@@ -329,7 +380,8 @@ const openAddModal = () => {
     kategoriId: null,
     satuan: '',
     harga: 0,
-    isActive: true
+    isActive: true,
+    qty: 1
   }
   modalError.value = ''
   showModal.value = true
@@ -399,6 +451,35 @@ const executeDelete = async () => {
     await loadData()
   } catch (e: unknown) {
     modalError.value = e instanceof Error ? e.message : 'Gagal menghapus'
+  } finally {
+    submitting.value = false
+  }
+}
+
+const openStockModal = (item: ProductResponse) => {
+  stockForm.value = {
+    kodeProduk: item.kodeProduk,
+    qty: 1,
+    tipe: 'MASUK',
+    keterangan:''
+  }
+  modalError.value = ''
+  showStockModal.value = true
+}
+
+const closeStockModal = () => {
+  showStockModal.value = false
+}
+
+const submitStockForm = async () => {
+  try {
+    submitting.value = true
+    modalError.value = ''
+    await apiAddStock(stockForm.value)
+    closeStockModal()
+    await loadData()
+  } catch (e: unknown) {
+    modalError.value = e instanceof Error ? e.message : 'Gagal menambah stok'
   } finally {
     submitting.value = false
   }
@@ -578,6 +659,7 @@ const executeDelete = async () => {
   transition: all 0.2s;
 }
 .btn-action:hover { border-color: #cbd5e1; color: #1e293b; }
+.btn-action.add-stock:hover { border-color: #10b981; color: #10b981; background: #ecfdf5; }
 .btn-action.delete:hover { border-color: #fca5a5; color: #ef4444; background: #fef2f2; }
 
 /* ── Pagination ── */

@@ -249,7 +249,60 @@ export interface ProductRequest {
   satuan: string
   harga: number
   isActive: boolean
+  qty?: number
 }
+
+export interface AddStockRequest {
+  kodeProduk: string
+  qty: number
+  tipe: string
+}
+
+export interface StokMutasiResponse {
+  id: number
+  produkId: number
+  kodeProduk: string
+  namaProduk: string
+  tipe: string
+  qty: number
+  stokSebelum: number
+  stokSesudah: number
+  keterangan: string
+  createdAt: string
+}
+
+export const apiGetStokMutasi = async (page: number = 0, size: number = 10, tipe?: string, namaProduk?: string): Promise<PaginatedData<StokMutasiResponse>> => {
+  const params = new URLSearchParams()
+  params.append('page', page.toString())
+  params.append('size', size.toString())
+  if (tipe) params.append('tipe', tipe)
+  if (namaProduk) params.append('namaProduk', namaProduk)
+
+  const res = await fetch(`${BASE_URL}/stok-mutasi?${params.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+  })
+  const json: BaseResponse<PaginatedData<StokMutasiResponse>> = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat mutasi stok')
+  return json.data
+}
+
+export const apiGetStokMutasiDetail = async (kodeProduk: string, page: number = 0, size: number = 10, tipe?: string): Promise<PaginatedData<StokMutasiResponse>> => {
+  const params = new URLSearchParams()
+  params.append('kodeProduk', kodeProduk)
+  params.append('page', page.toString())
+  params.append('size', size.toString())
+  if (tipe) params.append('tipe', tipe)
+
+  const res = await fetch(`${BASE_URL}/stok-mutasi/detail?${params.toString()}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+  })
+  const json: BaseResponse<PaginatedData<StokMutasiResponse>> = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal memuat detail mutasi stok')
+  return json.data
+}
+
 
 export const apiGetProducts = async (page: number = 0, size: number = 10, nama?: string, kategori?: string): Promise<PaginatedData<ProductResponse>> => {
   const params = new URLSearchParams()
@@ -320,6 +373,17 @@ export const apiDeleteProduct = async (id: number): Promise<void> => {
   const json: BaseResponse<null> = await res.json()
   if (!res.ok || !json.success) throw new Error(json.message || 'Gagal menghapus produk')
 }
+
+export const apiAddStock = async (body: AddStockRequest): Promise<void> => {
+  const res = await fetch(`${BASE_URL}/products/stock`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
+    body: JSON.stringify(body),
+  })
+  const json: BaseResponse<null> = await res.json()
+  if (!res.ok || !json.success) throw new Error(json.message || 'Gagal menambah stok')
+}
+
 
 // ============================================================
 // Category (Kategori) Types & Endpoints
