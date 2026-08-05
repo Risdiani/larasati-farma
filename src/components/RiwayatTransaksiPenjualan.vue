@@ -60,7 +60,15 @@
           <thead>
             <tr>
               <th style="width: 15%">ID Transaksi</th>
-              <th style="width: 15%">Tanggal</th>
+              <th style="width: 15%">
+                <div class="flex items-center gap-1 cursor-pointer select-none" @click="toggleSort('transactionDate')">
+                  Tanggal
+                  <div class="flex flex-col sort-icons">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" :stroke="sortField === 'transactionDate' && sortOrder === 'asc' ? '#3b82f6' : '#94a3b8'" stroke-width="3"><polyline points="18 15 12 9 6 15"/></svg>
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" :stroke="sortField === 'transactionDate' && sortOrder === 'desc' ? '#3b82f6' : '#94a3b8'" stroke-width="3"><polyline points="6 9 12 15 18 9"/></svg>
+                  </div>
+                </div>
+              </th>
               <th style="width: 20%">Sumber Data</th>
               <th style="width: 15%">Total Item</th>
               <th style="width: 20%">Total Harga</th>
@@ -200,6 +208,29 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const startDate = ref('')
 const endDate = ref('')
 
+// Sort state
+const sortField = ref<'kodeTransaksi' | 'transactionDate' | null>(null)
+const sortOrder = ref<'asc' | 'desc' | null>(null)
+
+const toggleSort = (field: 'kodeTransaksi' | 'transactionDate') => {
+  if (sortField.value !== field) {
+    sortField.value = field
+    sortOrder.value = 'asc'
+  } else {
+    if (sortOrder.value === 'asc') sortOrder.value = 'desc'
+    else if (sortOrder.value === 'desc') {
+      sortOrder.value = null
+      sortField.value = null
+    }
+  }
+
+  if (currentPage.value !== 1) {
+    currentPage.value = 1
+  } else {
+    loadData()
+  }
+}
+
 // Pagination state
 const currentPage = ref(1)
 const itemsPerPage = ref(10)
@@ -231,7 +262,7 @@ const loadData = async () => {
     successMsg.value = ''
     
     const pageIndex = currentPage.value - 1
-    const res = await apiGetTransactions(pageIndex, itemsPerPage.value, startDate.value || undefined, endDate.value || undefined)
+    const res = await apiGetTransactions(pageIndex, itemsPerPage.value, startDate.value || undefined, endDate.value || undefined, sortField.value || undefined, sortOrder.value || undefined)
     
     totalPages.value = res.totalPages
     totalPages.value = res.totalPages
@@ -499,6 +530,12 @@ const formatQty = (qty: number) => {
   vertical-align: middle;
 }
 .data-table tr:hover td { background: #fcfcfd; }
+
+.cursor-pointer { cursor: pointer; }
+.select-none { user-select: none; }
+.gap-1 { gap: 4px; }
+.sort-icons { margin-left: 2px; line-height: 0; }
+.sort-icons svg { display: block; margin: -1px 0; }
 
 .text-blue-500 { color: #3b82f6; }
 .font-medium { font-weight: 500; }

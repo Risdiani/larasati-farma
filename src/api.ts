@@ -453,12 +453,22 @@ export interface PaginatedData<T> {
   empty: boolean
 }
 
-export const apiGetTransactions = async (page: number = 0, size: number = 10, tglAwal?: string, tglAkhir?: string): Promise<PaginatedData<TransactionRes>> => {
+export const apiGetTransactions = async (
+  page: number = 0, 
+  size: number = 10, 
+  tglAwal?: string, 
+  tglAkhir?: string,
+  sortField?: string,
+  sortOrder?: string
+): Promise<PaginatedData<TransactionRes>> => {
   const params = new URLSearchParams()
   params.append('page', page.toString())
   params.append('size', size.toString())
   if (tglAwal) params.append('tglAwal', tglAwal)
   if (tglAkhir) params.append('tglAkhir', tglAkhir)
+  if (sortField && sortOrder) {
+    params.append('sort', `${sortField},${sortOrder}`)
+  }
 
   const res = await fetch(`${BASE_URL}/transactions?${params.toString()}`, {
     method: 'GET',
